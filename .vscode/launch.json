@@ -2,10 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "command": "npm run dev",
-      "name": "Run development server",
+      "name": "Launch Chrome",
       "request": "launch",
-      "type": "node-terminal"
+      "type": "chrome",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "preLaunchTask": "vite:dev"
     }
   ]
 }

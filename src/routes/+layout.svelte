@@ -7,7 +7,7 @@
 
 <div>
 	<ModeWatcher />
-	<Navbar />
+	<!-- <Navbar /> -->
 	{@render children()}
 </div>
 
