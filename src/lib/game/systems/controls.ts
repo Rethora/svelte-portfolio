@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { CONTROLS } from '../utils/constants';
 
-class Controls extends THREE.EventDispatcher {
+export class Controls extends THREE.EventDispatcher {
 	private enabled = false;
 	private isLocked = false;
 	private cannonBody: CANNON.Body;
@@ -13,8 +14,8 @@ class Controls extends THREE.EventDispatcher {
 	private moveLeft = false;
 	private moveRight = false;
 	private canJump = false;
-	private velocityFactor = 0.2;
-	private jumpVelocity = 20;
+	private velocityFactor = CONTROLS.VELOCITY_FACTOR;
+	private jumpVelocity = CONTROLS.JUMP_VELOCITY;
 	private inputVelocity = new THREE.Vector3();
 	private euler = new THREE.Euler();
 	private lockEvent = { type: 'lock' };
@@ -237,5 +238,3 @@ class Controls extends THREE.EventDispatcher {
 		this.yawObject.position.copy(this.cannonBody.position);
 	}
 }
-
-export { Controls };

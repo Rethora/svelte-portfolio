@@ -1,0 +1,33 @@
+export const PHYSICS = {
+	TIME_STEP: 1 / 60,
+	GRAVITY: -20,
+	CONTACT_MATERIAL: {
+		FRICTION: 0.3,
+		RESTITUTION: 0.3,
+		STIFFNESS: 1e9,
+		RELAXATION: 4
+	},
+	SOLVER: {
+		ITERATIONS: 7,
+		TOLERANCE: 0.1
+	}
+};
+
+export const PLAYER = {
+	MASS: 5,
+	RADIUS: 1.3,
+	LINEAR_DAMPING: 0.9,
+	START_POSITION: { x: 0, y: 5, z: 0 }
+};
+
+export const PROJECTILE = {
+	RADIUS: 0.2,
+	MASS: 5,
+	VELOCITY: 15
+};
+
+export const CONTROLS = {
+	VELOCITY_FACTOR: 0.2,
+	JUMP_VELOCITY: 20,
+	MOUSE_SENSITIVITY: 0.002
+};
