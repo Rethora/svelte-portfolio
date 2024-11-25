@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { createVisualMaterials } from '../utils/materials';
+import type { PlayerState } from '$lib/game/types';
 
 export class Scene {
 	private scene: THREE.Scene;
@@ -8,6 +9,7 @@ export class Scene {
 	private renderer: THREE.WebGLRenderer;
 	private boxMeshes: THREE.Mesh[] = [];
 	private materials = createVisualMaterials();
+	private remotePlayers: Map<string, THREE.Object3D> = new Map();
 
 	constructor() {
 		this.scene = new THREE.Scene();
@@ -90,6 +92,32 @@ export class Scene {
 		for (let i = 0; i < bodies.length; i++) {
 			this.boxMeshes[i].position.copy(bodies[i].position as any);
 			this.boxMeshes[i].quaternion.copy(bodies[i].quaternion as any);
+		}
+	}
+
+	public createRemotePlayer(playerState: PlayerState) {
+		const geometry = new THREE.BoxGeometry(1, 2, 1);
+		const material = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+		const playerMesh = new THREE.Mesh(geometry, material);
+
+		playerMesh.position.copy(playerState.position);
+		this.scene.add(playerMesh);
+		this.remotePlayers.set(playerState.id, playerMesh);
+	}
+
+	public removeRemotePlayer(playerId: string) {
+		const playerMesh = this.remotePlayers.get(playerId);
+		if (playerMesh) {
+			this.scene.remove(playerMesh);
+			this.remotePlayers.delete(playerId);
+		}
+	}
+
+	public updateRemotePlayer(playerState: PlayerState) {
+		const playerMesh = this.remotePlayers.get(playerState.id);
+		if (playerMesh) {
+			playerMesh.position.copy(playerState.position);
+			playerMesh.rotation.setFromVector3(playerState.rotation);
 		}
 	}
 }

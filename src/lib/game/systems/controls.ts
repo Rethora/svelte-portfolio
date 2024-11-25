@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { CONTROLS } from '../utils/constants';
+import { socketService } from '../core/socket';
 
 export class Controls extends THREE.EventDispatcher {
 	private enabled = false;
@@ -236,5 +237,11 @@ export class Controls extends THREE.EventDispatcher {
 		this.velocity.z += this.inputVelocity.z;
 
 		this.yawObject.position.copy(this.cannonBody.position);
+
+		// Send position update to server
+		socketService.updatePosition(
+			this.cannonBody.position,
+			new THREE.Vector3(0, this.yawObject.rotation.y, 0)
+		);
 	}
 }

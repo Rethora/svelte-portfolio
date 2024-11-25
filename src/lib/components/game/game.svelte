@@ -8,6 +8,7 @@
 	import { createPhysicsMaterial, createVisualMaterials } from '$lib/game/utils/materials';
 	import { PLAYER, PHYSICS } from '$lib/game/utils/constants';
 	import * as CANNON from 'cannon-es';
+	import { socketService } from '$lib/game/core/socket';
 
 	let scene: Scene;
 	let world: PhysicsWorld;
@@ -45,17 +46,33 @@
 		// Initialize engine
 		engine = new Engine(scene, world, controls);
 
+		// Connect to socket server
+		socketService.connect();
+
+		// Handle other players
+		socketService.setOnPlayerJoined((playerState) => {
+			scene.createRemotePlayer(playerState);
+		});
+
+		socketService.setOnPlayerLeft((playerId) => {
+			scene.removeRemotePlayer(playerId);
+		});
+
+		socketService.setOnPlayerMoved((playerState) => {
+			scene.updateRemotePlayer(playerState);
+		});
+
 		// Start animation loop
 		engine.animate();
 
 		// Setup event listeners
-
 		initPointerLock();
 		window.addEventListener('resize', scene.handleResize);
 
 		return () => {
 			controls.dispose();
 			window.removeEventListener('resize', scene.handleResize);
+			socketService.disconnect();
 		};
 	});
 
