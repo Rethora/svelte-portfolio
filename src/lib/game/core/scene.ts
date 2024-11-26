@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { createVisualMaterials } from '../utils/materials';
+import { Character } from '$lib/game/models/character';
+import { createVisualMaterials } from '$lib/game/utils/materials';
 import type { PlayerState } from '$lib/game/types';
 
 export class Scene {
@@ -9,18 +10,21 @@ export class Scene {
 	private renderer: THREE.WebGLRenderer;
 	private boxMeshes: THREE.Mesh[] = [];
 	private materials = createVisualMaterials();
-	private remotePlayers: Map<string, THREE.Object3D> = new Map();
+	private remotePlayers: Map<string, Character> = new Map();
+	private lastTime: number = 0;
+	private localPlayer: Character | null = null;
 
 	constructor() {
 		this.scene = new THREE.Scene();
 		this.camera = new THREE.PerspectiveCamera(
-			75,
+			90,
 			window.innerWidth / window.innerHeight,
 			0.1,
 			1000
 		);
 		this.renderer = new THREE.WebGLRenderer({ antialias: true });
 		this.init();
+		window.addEventListener('resize', () => this.handleResize());
 		document.body.appendChild(this.renderer.domElement);
 	}
 
@@ -69,10 +73,26 @@ export class Scene {
 	}
 
 	public render() {
+		const time = performance.now();
+		const delta = (time - this.lastTime) / 1000;
+
+		// Update local player animation if it exists
+		if (this.localPlayer) {
+			this.localPlayer.update(delta);
+		}
+
+		// Update remote players
+		this.remotePlayers.forEach((character) => {
+			character.update(delta);
+		});
+
 		this.renderer.render(this.scene, this.camera);
+		this.lastTime = time;
 	}
 
 	public handleResize() {
+		if (!this.camera || !this.renderer) return;
+
 		this.camera.aspect = window.innerWidth / window.innerHeight;
 		this.camera.updateProjectionMatrix();
 		this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -90,34 +110,57 @@ export class Scene {
 
 	public updateBoxes(bodies: CANNON.Body[]) {
 		for (let i = 0; i < bodies.length; i++) {
-			this.boxMeshes[i].position.copy(bodies[i].position as any);
-			this.boxMeshes[i].quaternion.copy(bodies[i].quaternion as any);
+			this.boxMeshes[i].position.copy(bodies[i].position);
+			this.boxMeshes[i].quaternion.copy(bodies[i].quaternion);
 		}
 	}
 
-	public createRemotePlayer(playerState: PlayerState) {
-		const geometry = new THREE.BoxGeometry(1, 2, 1);
-		const material = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-		const playerMesh = new THREE.Mesh(geometry, material);
+	public async createRemotePlayer(playerState: PlayerState) {
+		const character = new Character();
+		await character.init();
 
-		playerMesh.position.copy(playerState.position);
-		this.scene.add(playerMesh);
-		this.remotePlayers.set(playerState.id, playerMesh);
+		character.setPosition(playerState.position);
+		character.setRotation(playerState.rotation);
+
+		this.scene.add(character.getObject());
+		this.remotePlayers.set(playerState.id, character);
 	}
 
 	public removeRemotePlayer(playerId: string) {
-		const playerMesh = this.remotePlayers.get(playerId);
-		if (playerMesh) {
-			this.scene.remove(playerMesh);
+		const character = this.remotePlayers.get(playerId);
+		if (character) {
+			this.scene.remove(character.getObject());
 			this.remotePlayers.delete(playerId);
 		}
 	}
 
 	public updateRemotePlayer(playerState: PlayerState) {
-		const playerMesh = this.remotePlayers.get(playerState.id);
-		if (playerMesh) {
-			playerMesh.position.copy(playerState.position);
-			playerMesh.rotation.setFromVector3(playerState.rotation);
+		console.log('playerState', playerState);
+		const character = this.remotePlayers.get(playerState.id);
+		if (character) {
+			character.setPosition(playerState.position);
+			character.setRotation(playerState.rotation);
+
+			// Update animation based on state
+			if (playerState.isJumping) {
+				character.jump();
+			} else if (playerState.velocity > 5) {
+				character.run();
+			} else if (playerState.velocity > 0.1) {
+				character.walk();
+			} else {
+				character.idle();
+			}
 		}
+	}
+
+	public async createLocalPlayer() {
+		this.localPlayer = new Character();
+		await this.localPlayer.init();
+
+		// Add character to scene
+		this.scene.add(this.localPlayer.getObject());
+
+		return this.localPlayer;
 	}
 }

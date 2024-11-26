@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { CONTROLS } from '../utils/constants';
-import { socketService } from '../core/socket';
+import { CONTROLS, PLAYER } from '$lib/game/utils/constants';
+import { socketService } from '$lib/game/core/socket';
+import { Character } from '$lib/game/models/character';
 
 export class Controls extends THREE.EventDispatcher {
 	private enabled = false;
@@ -22,14 +23,39 @@ export class Controls extends THREE.EventDispatcher {
 	private lockEvent = { type: 'lock' };
 	private unlockEvent = { type: 'unlock' };
 	private velocity = new CANNON.Vec3();
+	private character: Character | null = null;
+	private minPitch = -Math.PI / 6;
+	private maxPitch = Math.PI / 6;
+	private pov: 'first' | 'third' = 'third';
+	private eyeWorldPosition = new THREE.Vector3();
+	private eyeForwardVector = new THREE.Vector3();
+	private boneRotations = {
+		spine1: 0,
+		spine2: 0,
+		spine3: 0,
+		neck: 0,
+		head: 0
+	};
 
 	constructor(camera: THREE.Camera, cannonBody: CANNON.Body) {
 		super();
 		this.cannonBody = cannonBody;
 
+		const baseEyeHeight = PLAYER.MODEL.EYE_LEVEL * PLAYER.MODEL.SCALE;
+
+		if (this.pov === 'first') {
+			camera.position.set(0, 0, PLAYER.CAMERA.FORWARD_OFFSET);
+			this.pitchObject.position.set(0, baseEyeHeight, 0);
+		} else if (this.pov === 'third') {
+			camera.position.set(0, 4, 4);
+			camera.lookAt(0, 0, -3);
+		}
+
 		this.pitchObject.add(camera);
 
-		this.yawObject.position.y = 2;
+		this.minPitch = PLAYER.CAMERA.PITCH_MIN;
+		this.maxPitch = PLAYER.CAMERA.PITCH_MAX;
+
 		this.yawObject.add(this.pitchObject);
 
 		const contactNormal = new CANNON.Vec3(); // Normal in the contact, pointing *out* of whatever the player touched
@@ -119,13 +145,12 @@ export class Controls extends THREE.EventDispatcher {
 
 		const { movementX, movementY } = event;
 
-		this.yawObject.rotation.y -= movementX * 0.002;
-		this.pitchObject.rotation.x -= movementY * 0.002;
+		this.yawObject.rotation.y -= movementX * CONTROLS.MOUSE_SENSITIVITY;
 
-		this.pitchObject.rotation.x = Math.max(
-			-Math.PI / 2,
-			Math.min(Math.PI / 2, this.pitchObject.rotation.x)
-		);
+		const pitchSensitivity = CONTROLS.MOUSE_SENSITIVITY * 0.8;
+		const newPitch = this.pitchObject.rotation.x - movementY * pitchSensitivity;
+
+		this.pitchObject.rotation.x = Math.max(this.minPitch, Math.min(this.maxPitch, newPitch));
 	};
 
 	onKeyDown = (event: KeyboardEvent) => {
@@ -201,32 +226,78 @@ export class Controls extends THREE.EventDispatcher {
 		this.enabled = enabled;
 	}
 
-	update(delta: number) {
+	public setCharacter(character: Character) {
+		this.character = character;
+	}
+
+	public updateBoneRotations(rotations: {
+		spine1: number;
+		spine2: number;
+		spine3: number;
+		neck: number;
+		head: number;
+	}) {
+		this.boneRotations = rotations;
+	}
+
+	private calculateEyePosition(): THREE.Vector3 {
+		const spineHeight = PLAYER.MODEL.SPINE_BASE * PLAYER.MODEL.SCALE;
+
+		// Start from base position
+		const position = new THREE.Vector3(0, spineHeight, 0);
+
+		// Apply spine1 rotation
+		position.y += Math.cos(this.boneRotations.spine1) * 0.2;
+		position.z += Math.sin(this.boneRotations.spine1) * 0.2;
+
+		// Apply spine2 rotation
+		position.y += Math.cos(this.boneRotations.spine2) * 0.2;
+		position.z += Math.sin(this.boneRotations.spine2) * 0.2;
+
+		// Apply spine3 rotation
+		position.y += Math.cos(this.boneRotations.spine3) * 0.2;
+		position.z += Math.sin(this.boneRotations.spine3) * 0.2;
+
+		// Apply neck rotation
+		position.y += Math.cos(this.boneRotations.neck) * 0.15;
+		position.z += Math.sin(this.boneRotations.neck) * 0.15;
+
+		// Apply head rotation and eye offset
+		position.y += Math.cos(this.boneRotations.head) * 0.1;
+		position.z += Math.sin(this.boneRotations.head) * 0.1;
+
+		// Add eye forward offset
+		position.z += PLAYER.MODEL.EYE_FORWARD;
+
+		return position;
+	}
+
+	update(dt: number): void {
 		if (this.enabled === false) {
 			return;
 		}
 
-		delta *= 1000;
-		delta *= 0.1;
+		dt *= 1000;
+		dt *= 0.1;
 
 		this.inputVelocity.set(0, 0, 0);
 
 		if (this.moveForward) {
-			this.inputVelocity.z = -this.velocityFactor * delta;
+			this.inputVelocity.z = -this.velocityFactor * dt;
 		}
 		if (this.moveBackward) {
-			this.inputVelocity.z = this.velocityFactor * delta;
+			this.inputVelocity.z = this.velocityFactor * dt;
 		}
 
 		if (this.moveLeft) {
-			this.inputVelocity.x = -this.velocityFactor * delta;
+			this.inputVelocity.x = -this.velocityFactor * dt;
 		}
 		if (this.moveRight) {
-			this.inputVelocity.x = this.velocityFactor * delta;
+			this.inputVelocity.x = this.velocityFactor * dt;
 		}
 
 		// Convert velocity to world coordinates
-		this.euler.x = this.pitchObject.rotation.x;
+		this.euler.x = 0;
 		this.euler.y = this.yawObject.rotation.y;
 		this.euler.order = 'XYZ';
 		this.quaternion.setFromEuler(this.euler);
@@ -236,12 +307,64 @@ export class Controls extends THREE.EventDispatcher {
 		this.velocity.x += this.inputVelocity.x;
 		this.velocity.z += this.inputVelocity.z;
 
+		// Update character position and rotation
+		if (this.character) {
+			const characterPosition = new THREE.Vector3(
+				this.cannonBody.position.x,
+				this.cannonBody.position.y,
+				this.cannonBody.position.z
+			);
+
+			this.character.setPosition(characterPosition);
+			this.character.setRotation(new THREE.Vector3(0, this.yawObject.rotation.y, 0));
+
+			const normalizedPitch = this.pitchObject.rotation.x * PLAYER.CAMERA.HEAD_PITCH_RATIO;
+			this.character.updateRotations(normalizedPitch);
+
+			// Get bone rotations back from character for camera sync
+			if (this.pov === 'first') {
+				// Calculate new eye position based on bone chain
+				const eyePosition = this.calculateEyePosition();
+
+				// Update pitch object position to match eye position
+				this.pitchObject.position.copy(eyePosition);
+
+				// Get the camera
+				const camera = this.pitchObject.children[0] as THREE.Camera;
+
+				// Update camera local position to maintain eye alignment
+				camera.position.set(0, 0, PLAYER.CAMERA.FORWARD_OFFSET);
+			}
+
+			const velocity = Math.sqrt(
+				this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+			);
+
+			if (!this.canJump) {
+				this.character.jump();
+			} else if (velocity > 5) {
+				this.character.run();
+			} else if (velocity > 0.1) {
+				this.character.walk();
+			} else {
+				this.character.idle();
+			}
+		}
+
+		// Update yaw object position
 		this.yawObject.position.copy(this.cannonBody.position);
+
+		// Calculate velocity magnitude for animation state
+		const velocity = Math.sqrt(
+			this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+		);
 
 		// Send position update to server
 		socketService.updatePosition(
 			this.cannonBody.position,
-			new THREE.Vector3(0, this.yawObject.rotation.y, 0)
+			new CANNON.Vec3(0, this.yawObject.rotation.y, 0),
+			!this.canJump,
+			velocity
 		);
 	}
 }

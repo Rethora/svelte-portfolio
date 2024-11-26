@@ -5,7 +5,6 @@
 	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card';
 	import Typography from '$lib/components/ui/typography/typography.svelte';
-	import io from 'socket.io-client';
 
 	let hoveredPortfolio = $state(false);
 	let hoveredGame = $state(false);

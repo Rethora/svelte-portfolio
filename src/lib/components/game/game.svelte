@@ -17,9 +17,9 @@
 
 	function createRandomBoxes(count: number) {
 		for (let i = 0; i < count; i++) {
-			const x = (Math.random() - 0.5) * 20;
-			const y = (Math.random() - 0.5) * 1 + 1;
-			const z = (Math.random() - 0.5) * 20;
+			const x = 0;
+			const y = 0;
+			const z = i * -6;
 
 			const boxBody = world.createBox({ x, y, z });
 			scene.createBoxMesh();
@@ -40,16 +40,13 @@
 		controls = new Controls(scene.getCamera(), playerBody);
 		scene.add(controls.getObject());
 
-		// Create some random boxes
-		createRandomBoxes(7);
-
 		// Initialize engine
 		engine = new Engine(scene, world, controls);
 
-		// Connect to socket server
+		// Connect to socket server first
 		socketService.connect();
 
-		// Handle other players
+		// Set up socket handlers
 		socketService.setOnPlayerJoined((playerState) => {
 			scene.createRemotePlayer(playerState);
 		});
@@ -61,6 +58,19 @@
 		socketService.setOnPlayerMoved((playerState) => {
 			scene.updateRemotePlayer(playerState);
 		});
+
+		// Wait for socket connection and then create local player
+		const socket = socketService.getSocket();
+		if (socket) {
+			socket.on('connect', async () => {
+				// Create local player character after connection
+				const localPlayer = await scene.createLocalPlayer();
+				controls.setCharacter(localPlayer);
+			});
+		}
+
+		// Create some random boxes
+		createRandomBoxes(7);
 
 		// Start animation loop
 		engine.animate();
@@ -98,6 +108,7 @@
 			controls.lock();
 		});
 
+		// @ts-expect-error Event type is never
 		controls.addEventListener('lock', () => {
 			controls.setEnabled(true);
 			if (browser) {
@@ -105,6 +116,7 @@
 			}
 		});
 
+		// @ts-expect-error Event type is never
 		controls.addEventListener('unlock', () => {
 			controls.setEnabled(false);
 			if (browser) {
@@ -117,7 +129,7 @@
 <div id="instructions">
 	<span>Click to play</span>
 	<br />
-	(W,A,S,D = Move, SPACE = Jump, MOUSE = Look, CLICK = Shoot)
+	(W,A,S,D = Move, SPACE = Jump, MOUSE = Look)
 </div>
 
 <style>

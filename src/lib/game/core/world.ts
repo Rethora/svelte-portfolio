@@ -1,5 +1,5 @@
 import * as CANNON from 'cannon-es';
-import { PHYSICS } from '../utils/constants';
+import { PHYSICS } from '$lib/game/utils/constants';
 
 export class PhysicsWorld {
 	private world: CANNON.World;

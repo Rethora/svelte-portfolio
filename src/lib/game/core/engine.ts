@@ -1,8 +1,8 @@
 import Stats from 'three/addons/libs/stats.module.js';
-import { Scene } from './scene';
-import { PhysicsWorld } from './world';
-import { Controls } from '../systems/controls';
-import { PHYSICS } from '../utils/constants';
+import { Scene } from '$lib/game/core/scene';
+import { PhysicsWorld } from '$lib/game/core/world';
+import { Controls } from '$lib/game/systems/controls';
+import { PHYSICS } from '$lib/game/utils/constants';
 
 export class Engine {
 	private scene: Scene;

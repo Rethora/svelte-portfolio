@@ -5,4 +5,5 @@ export interface PlayerState {
 	position: Vector3;
 	rotation: Vector3;
 	isJumping: boolean;
+	velocity: number;
 }
